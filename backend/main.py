@@ -1,6 +1,13 @@
+import os
+import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.interview import router as interview_router
+
+# Add the current directory to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Import the router using a relative import
+from .api.interview import router as interview_router
 
 app = FastAPI(title="AI Interviewer API", version="1.0.0")
 
