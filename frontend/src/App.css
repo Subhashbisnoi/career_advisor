@@ -1,0 +1,47 @@
+/* Additional custom styles */
+.interview-card {
+    transition: all 0.3s ease;
+  }
+  
+  .interview-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  }
+  
+  .question-card {
+    border-left: 4px solid #3b82f6;
+  }
+  
+  .feedback-positive {
+    border-left-color: #10b981;
+  }
+  
+  .feedback-neutral {
+    border-left-color: #f59e0b;
+  }
+  
+  .feedback-negative {
+    border-left-color: #ef4444;
+  }
+  
+  .roadmap-content {
+    line-height: 1.8;
+  }
+  
+  .roadmap-content h1,
+  .roadmap-content h2,
+  .roadmap-content h3 {
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+  }
+  
+  .roadmap-content ul,
+  .roadmap-content ol {
+    margin-left: 1.5rem;
+    margin-bottom: 1rem;
+  }
+  
+  .roadmap-content li {
+    margin-bottom: 0.5rem;
+  }
