@@ -6,11 +6,12 @@ from pathlib import Path
 from typing import List, Dict, Any
 import json
 
-from models import InterviewState
-from common import extract_resume_text
-from generator import generate_question
-from feedback import feedback_generator
-from roadmap import generate_roadmap
+# Use relative imports since we're in a package
+from ..models import InterviewState
+from ..common import extract_resume_text
+from ..generator import generate_question
+from ..feedback import feedback_generator
+from ..roadmap import generate_roadmap
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
 
