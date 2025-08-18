@@ -3,44 +3,45 @@ import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Add the current directory to the Python path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add the parent directory to the Python path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.append(parent_dir)
 
-# Import the router using a relative import
-from .api.interview import router as interview_router
 
-app = FastAPI(title="AI Interviewer API", version="1.0.0")
+# Import the router (always use absolute import for package mode)
+from backend.api.interview import router as interview_router
 
-# Add CORS middleware (dev-friendly)
-app.add_middleware(
-	CORSMiddleware,
-	allow_origins=["*"],
-	allow_credentials=True,
-	allow_methods=["*"],
-	allow_headers=["*"],
-)
+app = FastAPI()
 
-# Include routers
-app.include_router(interview_router)
-
-@app.get("/")
-async def root():
-	return {"message": "AI Interviewer API is running"}
-
-@app.get("/health")
-async def health_check():
-	"""Health check endpoint."""
-	return {"status": "healthy", "message": "AI Interviewer API is running"}
-
+# Configure CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://your-vercel-app.vercel.app"],  # Update this after deployment
+    allow_origins=["*"],  # In production, replace with your frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Include routers
+app.include_router(interview_router)
+
+# Basic routes
+@app.get("/")
+async def root():
+    return {"message": "AI Interviewer API is running"}
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {
+        "status": "healthy", 
+        "message": "AI Interviewer API is running",
+        "version": "1.0.0"
+    }
+
 if __name__ == "__main__":
-	import uvicorn
-	uvicorn.run(app, host="0.0.0.0", port=8000)
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 

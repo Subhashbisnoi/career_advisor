@@ -22,15 +22,6 @@ feedback_llm = ChatOpenAI(model="gpt-4o-mini")
 structured_generator = generator_llm.with_structured_output(InterviewQuestions)
 structured_evaluator = feedback_llm.with_structured_output(StructuredEvaluator)
 
-import pdfplumber
-
-def extract_resume_text(resume_path):
-    with pdfplumber.open(resume_path) as pdf:
-        text = ""
-        for page in pdf.pages:
-            text += page.extract_text() or ""
-    return text
-
 graph=StateGraph(InterviewState)
 
 graph.add_node("generate_question",generate_question)

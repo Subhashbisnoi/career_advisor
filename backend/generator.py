@@ -1,5 +1,5 @@
-from common import generator_llm, extract_resume_text
-from models import InterviewState, InterviewQuestions
+from .common import generator_llm, extract_resume_text
+from .models import InterviewState, InterviewQuestions
 from langchain_core.messages import SystemMessage, HumanMessage
 
 
@@ -12,10 +12,8 @@ def generate_question(state: InterviewState) -> dict:
     Returns:
         dict: Dictionary containing the generated questions.
     """
-    # Prefer resume_text if present; else extract from resume_path
-    resume_text = state.get('resume_text') or (
-        extract_resume_text(state['resume_path']) if state.get('resume_path') else ""
-    )
+    # Get resume text directly from state (already extracted during upload)
+    resume_text = state.get('resume_text', '')
 
     structured_generator = generator_llm.with_structured_output(InterviewQuestions)
     messages = [

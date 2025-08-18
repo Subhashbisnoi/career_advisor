@@ -35,41 +35,36 @@ async def upload_resume(file: UploadFile = File(...)):
             raise HTTPException(status_code=413, detail="File too large (max 10MB)")
         
         # Save to a temporary file for text extraction
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
-            temp_file.write(content)
-            temp_path = temp_file.name
-        
+        temp_path = None
         try:
-            # Extract text from the PDF
-            resume_text = extract_resume_text(temp_path)
+            # Write the content to a temporary file (in case we need it for debugging)
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+                temp_file.write(content)
+                temp_path = temp_file.name
+            
+            # Extract text from the PDF using the already read content
+            resume_text = extract_resume_text(content)
             
             if not resume_text.strip():
                 raise HTTPException(status_code=400, detail="Failed to extract text from PDF")
                 
             return {"resume_text": resume_text}
             
-        finally:
-            # Clean up the temporary file
-            try:
-                os.unlink(temp_path)
-            except Exception:
-                pass
-                
-    except Exception as e:
-        if isinstance(e, HTTPException):
+        except HTTPException:
+            # Re-raise HTTP exceptions
             raise
-        raise HTTPException(status_code=500, detail=f"Error processing resume: {str(e)}")
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
-            temp_file.write(content)
-            temp_file_path = temp_file.name
-        
-        # Don't parse here; store only
-        resume_id = os.path.basename(temp_file_path)
-        uploaded_resumes[resume_id] = {
-            "path": temp_file_path,
-            "filename": file.filename,
-        }
-        
+            
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
+            
+        finally:
+            # Clean up the temporary file if it was created
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.unlink(temp_path)
+                except Exception:
+                    pass
+                    
         return {
             "message": "Resume uploaded successfully",
             "resume_id": resume_id,

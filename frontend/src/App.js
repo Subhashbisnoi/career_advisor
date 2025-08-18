@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Header from './components/Header';
 import Home from './components/Home';
 import Interview from './components/Interview';
-import Results from './components/Results';
+import Result from './components/Result';
 import './App.css';
 
 function App() {
@@ -46,7 +46,7 @@ function App() {
               path="/results" 
               element={
                 currentSession ? (
-                  <Results session={currentSession} />
+                  <Result session={currentSession} />
                 ) : (
                   <Navigate to="/" replace />
                 )

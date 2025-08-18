@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Home, Download, Star, TrendingUp, Target, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
-const Results = ({ session }) => {
+const Result = ({ session }) => {
   const [activeTab, setActiveTab] = useState('feedback');
 
   const getScoreColor = (score) => {
@@ -229,4 +229,4 @@ ${session.roadmap}
   );
 };
 
-export default Results;
+export default Result;
