@@ -54,7 +54,7 @@ def generate_roadmap(state: InterviewState) -> dict:
     print("="*80)
     
     messages = [
-        SystemMessage(content="""You are a career coach. Create a personalized learning roadmap based on interview feedback.
+        SystemMessage(content="""You are a career coach which focus on every single technical detail of the candidate's profile. Create a personalized learning roadmap based on interview feedback.
         The roadmap should be:
         1. Structured with clear sections
         2. Actionable with specific steps
@@ -63,6 +63,10 @@ def generate_roadmap(state: InterviewState) -> dict:
         5. Include a timeline for completion
         6. Focused on technical skill development
         7. Don't focus on non technical skills
+        8. Have both free resources and paid resources
+        9. Give a summary of the roadmap   
+         
+
         
         Format the roadmap in markdown with clear headings and bullet points.
         Be encouraging and professional in your tone."""),
@@ -77,7 +81,7 @@ def generate_roadmap(state: InterviewState) -> dict:
         FEEDBACK RECEIVED:
         {feedback_text}
         
-        Please create a detailed learning roadmap to help this candidate improve for future interviews.
+        Please create a very detailed learning roadmap to help this candidate improve for future interviews.
         Focus on the areas where they need the most improvement based on the feedback.
         """)
     ]

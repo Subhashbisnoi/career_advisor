@@ -3,15 +3,15 @@ import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Add the parent directory to the Python path
+# Add the current directory to the Python path
 current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.append(parent_dir)
+if current_dir not in sys.path:
+    sys.path.append(current_dir)
 
-
-# Import the router (always use absolute import for package mode)
+# Import the routers
 from backend.api.interview import router as interview_router
+from backend.api.tts import router as tts_router
+from backend.api.voice import router as voice_router
 
 app = FastAPI()
 
@@ -26,6 +26,8 @@ app.add_middleware(
 
 # Include routers
 app.include_router(interview_router)
+app.include_router(tts_router)
+app.include_router(voice_router)
 
 # Basic routes
 @app.get("/")

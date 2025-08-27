@@ -63,7 +63,7 @@ const Home = ({ onStartInterview }) => {
       uploadData.append('file', resumeFile);
 
       // Upload resume and extract text
-      const uploadResponse = await fetch('http://localhost:8000/interview/upload-resume', {
+      const uploadResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/interview/upload-resume`, {
         method: 'POST',
         body: uploadData
       });
@@ -80,7 +80,7 @@ const Home = ({ onStartInterview }) => {
       }
 
       // Start interview with extracted resume text
-      const interviewResponse = await fetch('http://localhost:8000/interview/start', {
+      const interviewResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/interview/start`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

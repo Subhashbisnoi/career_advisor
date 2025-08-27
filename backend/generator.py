@@ -2,41 +2,50 @@ from .common import generator_llm, extract_resume_text
 from .models import InterviewState, InterviewQuestions
 from langchain_core.messages import SystemMessage, HumanMessage
 
-
 def generate_question(state: InterviewState) -> dict:
-    """Generate interview questions based on the candidate's resume.
-    
-    Args:
-        state: Current interview state containing role, company, and resume path or text.
-        
-    Returns:
-        dict: Dictionary containing the generated questions.
-    """
-    # Get resume text directly from state (already extracted during upload)
-    resume_text = state.get('resume_text', '')
+    """Generate highly focused, role-specific interview questions 
+    that deeply evaluate the candidate's technical expertise 
+    based on their resume."""
+
+    # Extract resume text
+    resume_text = state.get("resume_text", "")
 
     structured_generator = generator_llm.with_structured_output(InterviewQuestions)
+
     messages = [
-        SystemMessage(content="You are an AI interviewer. You will ask focused, role-specific interview questions for the given company and role, based on the candidate's resume."),
+        SystemMessage(content="""
+You are an AI technical interviewer. 
+Your job is to ask exactly 3 interview questions that BEST test the candidate's readiness for the given role.
+The role and company context will be provided, along with the candidate’s resume.
+"""),
+        
         HumanMessage(content=f"""
-You are interviewing for the role of {state['role']} at {state['company']}.
+You are interviewing for the role of **{state['role']}** at **{state['company']}**.
+
 Here is the candidate's resume text:
 {resume_text}
-Use Resume Text to generate questions.
-Keep these thing in mind:
-->Do NOT ask generic behavioral or situational questions like 'tell me a time when....
-->the candidate's technical depth in the specific skills mentioned in their resume.
-->Questions must be challenging and require domain-specific application of knowledge.
-->Questions should be specific to the role and company.
 
-Generate exactly 3 interview questions meeting these criteria:
-1. The first two questions must be highly specific technical questions or challenges related to the domain of the role and the candidate's resume.
-2. The third question should touch on experience, communication, or collaboration skills, framed around handling a technical or domain-specific challenge in a real-world setting.
+Your task:
+- Generate *exactly 3 questions*.  
+- **Q1 and Q2**: VERY focused **technical deep-dive** questions directly from the candidate’s listed skills, projects, or technologies. 
+    - They must require applied expertise, not just definitions or trivia.  
+    - Example categories: debugging a system from their resume, optimizing real-world use cases, scaling an architecture they mentioned, analyzing algorithm tradeoffs they claim to know, etc.
+- **Q3**: A technical collaboration/experience-based question. 
+    - It should test how they explain, communicate, or handle **technical problem-solving in a team/real-world project scenario**, still tied to their resume or the role.  
+    - Do NOT ask generic "tell me about a time" questions—ground it in resume-based real challenges.
 
-Return ONLY the list of 3 questions, nothing else.
+Hard requirement:
+- Ask ONLY the **most skill-revealing questions** possible (assume you get only these 3 chances to know their depth).  
+- Do NOT ask fluffy or basic questions.  
+- Do NOT ask about personality or general behavior.  
+- Be role-specific + resume-specific.  
+
+Generate ONLY the 3 final questions, nothing else.
 """)
     ]
+
     response = structured_generator.invoke(messages)
+
     return {
         "question": response.questions
     }

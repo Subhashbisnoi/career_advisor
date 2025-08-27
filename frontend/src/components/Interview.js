@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, CheckCircle, ArrowRight, Brain } from 'lucide-react';
+import { Clock, CheckCircle, ArrowRight, Brain, Volume2, Mic, Square, Play, RotateCcw } from 'lucide-react';
+import VoiceRecorder from './VoiceRecorder';
 
 const Interview = ({ interviewData, onSessionCreated }) => {
   const navigate = useNavigate();
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [answers, setAnswers] = useState(['', '', '']);
+  const [answers, setAnswers] = useState(Array(interviewData.questions?.length).fill(''));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef(null);
 
   const questions = interviewData.questions || [];
 
@@ -15,6 +18,23 @@ const Interview = ({ interviewData, onSessionCreated }) => {
     const newAnswers = [...answers];
     newAnswers[currentQuestion] = value;
     setAnswers(newAnswers);
+  };
+
+  const handleVoiceRecordingComplete = (transcribedText) => {
+    handleAnswerChange(transcribedText);
+  };
+
+  const handleRecordingError = (error) => {
+    setError(error);
+  };
+  
+  const replayQuestion = () => {
+    if (questions.length > 0 && currentQuestion < questions.length) {
+      const utterance = new SpeechSynthesisUtterance(questions[currentQuestion]);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      window.speechSynthesis.speak(utterance);
+    }
   };
 
   const nextQuestion = () => {
@@ -39,7 +59,7 @@ const Interview = ({ interviewData, onSessionCreated }) => {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:8000/interview/submit-answers', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/interview/submit-answers`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -82,6 +102,107 @@ const Interview = ({ interviewData, onSessionCreated }) => {
     return index + 1;
   };
 
+  const playQuestionAudio = async (questionText) => {
+    try {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+
+      setIsPlaying(true);
+      
+      // Create a new audio element
+      const audio = new Audio();
+      audioRef.current = audio;
+      
+      // Set up event listeners
+      audio.onended = () => {
+        setIsPlaying(false);
+        audioRef.current = null;
+      };
+      
+      audio.onerror = () => {
+        setIsPlaying(false);
+        console.error('Error playing audio');
+      };
+      
+      // Call the TTS API
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/tts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: questionText,
+          language: 'en'
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate speech');
+      }
+      
+      // Create a blob URL from the response
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      
+      // Set the audio source and play
+      audio.src = audioUrl;
+      await audio.play();
+      
+    } catch (err) {
+      console.error('Error playing question:', err);
+      setIsPlaying(false);
+    }
+  };
+  
+  // Auto-speak question when it changes
+  useEffect(() => {
+    if (questions.length > 0 && currentQuestion < questions.length) {
+      const speakQuestion = async () => {
+        try {
+          // Cancel any ongoing speech
+          window.speechSynthesis.cancel();
+          
+          const utterance = new SpeechSynthesisUtterance(questions[currentQuestion]);
+          utterance.rate = 1.0;
+          utterance.pitch = 1.0;
+          
+          // Set playing state
+          setIsPlaying(true);
+          utterance.onend = () => setIsPlaying(false);
+          
+          window.speechSynthesis.speak(utterance);
+        } catch (err) {
+          console.error('Error speaking question:', err);
+          setIsPlaying(false);
+        }
+      };
+      
+      // Small delay to ensure the UI has updated
+      const timer = setTimeout(speakQuestion, 500);
+      
+      // Cleanup function
+      return () => {
+        clearTimeout(timer);
+        window.speechSynthesis.cancel();
+        setIsPlaying(false);
+      };
+    }
+  }, [currentQuestion, questions]);
+
+  // Clean up audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      window.speechSynthesis.cancel();
+      setIsPlaying(false);
+    };
+  }, []);
+
   return (
     <div className="max-w-4xl mx-auto">
       {/* Header */}
@@ -119,9 +240,19 @@ const Interview = ({ interviewData, onSessionCreated }) => {
               Question {getQuestionNumber(currentQuestion)}
             </span>
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 leading-relaxed">
-            {questions[currentQuestion]}
-          </h2>
+          <div className="flex items-center">
+            <h2 className="text-xl font-semibold text-gray-900 leading-relaxed flex-1">
+              {questions[currentQuestion]}
+            </h2>
+            <button
+              onClick={() => playQuestionAudio(questions[currentQuestion])}
+              disabled={isPlaying}
+              className="ml-4 p-2 text-gray-500 hover:text-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              aria-label="Play question audio"
+            >
+              <Volume2 className={`h-6 w-6 ${isPlaying ? 'text-primary-600' : ''}`} />
+            </button>
+          </div>
         </div>
 
         {/* Answer Input */}
@@ -129,12 +260,69 @@ const Interview = ({ interviewData, onSessionCreated }) => {
           <label className="block text-sm font-medium text-gray-700 mb-3">
             Your Answer
           </label>
-          <textarea
-            value={answers[currentQuestion]}
-            onChange={(e) => handleAnswerChange(e.target.value)}
-            placeholder="Type your answer here..."
-            className="w-full h-32 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
-          />
+          <div className="space-y-6">
+            {/* Question replay button */}
+            <div className="flex justify-center">
+              <button
+                onClick={replayQuestion}
+                className="flex items-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-100 rounded-lg hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                title="Replay question"
+              >
+                <Play className="w-4 h-4 mr-2" />
+                Replay Question
+              </button>
+            </div>
+            
+            {/* Voice recording section */}
+            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <h3 className="text-sm font-medium text-gray-700 mb-3">Your Answer</h3>
+              <VoiceRecorder
+                key={`recorder-${currentQuestion}`}
+                questionIndex={currentQuestion}
+                onRecordingComplete={handleVoiceRecordingComplete}
+                onError={handleRecordingError}
+                buttonText={answers[currentQuestion] ? 'Re-record Answer' : 'Record Answer'}
+              />
+              
+              {/* Show transcribed answer */}
+              {answers[currentQuestion] && (
+                <div className="mt-4 p-3 bg-white border border-gray-200 rounded-lg">
+                  <p className="text-sm text-gray-600 mb-2">Your transcribed answer:</p>
+                  <p className="text-gray-800">{answers[currentQuestion]}</p>
+                </div>
+              )}
+            </div>
+            
+            {/* Navigation buttons */}
+            <div className="flex justify-between pt-2">
+              <button
+                onClick={previousQuestion}
+                disabled={currentQuestion === 0}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50"
+              >
+                Previous
+              </button>
+              
+              {currentQuestion < questions.length - 1 ? (
+                <button
+                  onClick={nextQuestion}
+                  disabled={!answers[currentQuestion]}
+                  className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                >
+                  Next Question <ArrowRight className="ml-2 w-4 h-4" />
+                </button>
+              ) : (
+                <button
+                  onClick={submitInterview}
+                  disabled={!answers[currentQuestion] || isSubmitting}
+                  className="flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Submitting...' : 'Submit Interview'}
+                  {!isSubmitting && <CheckCircle className="ml-2 w-4 h-4" />}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Navigation */}

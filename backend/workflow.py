@@ -23,7 +23,7 @@ structured_generator = generator_llm.with_structured_output(InterviewQuestions)
 structured_evaluator = feedback_llm.with_structured_output(StructuredEvaluator)
 
 graph=StateGraph(InterviewState)
-
+#graph.add_node("company_details",company_details)
 graph.add_node("generate_question",generate_question)
 graph.add_node("answer_1st_question", answer_1st_question)
 graph.add_node("answer_2nd_question", answer_2nd_question)
@@ -31,6 +31,8 @@ graph.add_node("answer_3rd_question", answer_3rd_question)
 graph.add_node("feedback_generator", feedback_generator)
 graph.add_node("generate_roadmap", generate_roadmap)
 
+#graph.add_edge(START, "company_details")
+#graph.add_edge("company_details", "generate_question")
 graph.add_edge(START, "generate_question")
 graph.add_edge("generate_question", "answer_1st_question")
 graph.add_edge("answer_1st_question", "answer_2nd_question")
