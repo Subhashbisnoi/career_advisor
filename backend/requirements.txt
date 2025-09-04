@@ -10,3 +10,8 @@ pypdf2==3.0.1
 pypdfium2==4.25.0
 pydantic==2.11.7
 openai==1.99.6
+sqlalchemy==2.0.23
+alembic==1.12.1
+psycopg2-binary==2.9.9
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4

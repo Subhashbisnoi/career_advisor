@@ -1,5 +1,5 @@
-from .common import generator_llm, extract_resume_text
-from .models import InterviewState
+from common import generator_llm, extract_resume_text
+from models import InterviewState
 from langchain_core.messages import SystemMessage, HumanMessage
 
 def generate_roadmap(state: InterviewState) -> dict:

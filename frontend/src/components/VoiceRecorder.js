@@ -83,7 +83,7 @@ const VoiceRecorder = ({ onRecordingComplete, onError, buttonText = 'Record Answ
     try {
       setIsProcessing(true);
       const formData = new FormData();
-      formData.append('file', audioBlob, 'recording.wav');
+      formData.append('audio', audioBlob, 'recording.wav');
       
       const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/voice/transcribe`, {
         method: 'POST',

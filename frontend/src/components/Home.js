@@ -1,10 +1,13 @@
 import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
-import { Upload, FileText, Building, User, Play, ArrowRight, Brain, BarChart3 } from 'lucide-react';
+import { Upload, FileText, Brain, User, BarChart3, ArrowRight } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import AuthRequiredModal from './auth/AuthRequiredModal';
 
 const Home = ({ onStartInterview }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [resumeFile, setResumeFile] = useState(null);
   const [formData, setFormData] = useState({
     role: '',
@@ -12,6 +15,8 @@ const Home = ({ onStartInterview }) => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [formDataToSubmit, setFormDataToSubmit] = useState(null);
 
   const onDrop = useCallback((acceptedFiles) => {
     if (acceptedFiles.length > 0) {
@@ -48,25 +53,53 @@ const Home = ({ onStartInterview }) => {
       setError('Please upload a resume');
       return;
     }
-    
-    if (!formData.role.trim() || !formData.company.trim()) {
-      setError('Please fill in all fields');
+
+    if (!formData.role.trim()) {
+      setError('Please specify the target role');
       return;
     }
 
+    const interviewData = {
+      role: formData.role.trim(),
+      company: formData.company.trim(),
+      resumeFile
+    };
+
+    if (!user) {
+      setFormDataToSubmit(interviewData);
+      setShowAuthModal(true);
+      return;
+    }
+
+    // If user is logged in, proceed with the interview
+    await startInterview(interviewData);
+  };
+
+  const startInterview = async (data) => {
     setIsLoading(true);
     setError('');
-
+    
     try {
       // Create FormData for file upload
       const uploadData = new FormData();
-      uploadData.append('file', resumeFile);
+      uploadData.append('file', data.resumeFile);
+
+      // Get auth token if user is logged in
+      const token = localStorage.getItem('token');
+      const headers = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
 
       // Upload resume and extract text
-      const uploadResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/interview/upload-resume`, {
-        method: 'POST',
-        body: uploadData
-      });
+      const uploadResponse = await fetch(
+        `${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/interview/upload-resume`,
+        {
+          method: 'POST',
+          headers,
+          body: uploadData
+        }
+      );
 
       if (!uploadResponse.ok) {
         const errorData = await uploadResponse.json().catch(() => ({}));
@@ -80,17 +113,21 @@ const Home = ({ onStartInterview }) => {
       }
 
       // Start interview with extracted resume text
-      const interviewResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/interview/start`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          role: formData.role,
-          company: formData.company,
-          resume_text: resume_text
-        })
-      });
+      const interviewResponse = await fetch(
+        `${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/interview/start`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...headers
+          },
+          body: JSON.stringify({
+            role: data.role,
+            company: data.company,
+            resume_text: resume_text
+          })
+        }
+      );
 
       if (!interviewResponse.ok) {
         const errorData = await interviewResponse.json().catch(() => ({}));
@@ -99,49 +136,80 @@ const Home = ({ onStartInterview }) => {
 
       const interviewResult = await interviewResponse.json();
 
-      // Pass data to parent component and navigate
+      // Pass data to parent component
       onStartInterview({
-        ...formData,
+        role: data.role,
+        company: data.company,
         resume_text: resume_text,
         questions: interviewResult.questions,
         session_id: interviewResult.session_id
       });
 
+      // Navigate to interview page
       navigate('/interview');
     } catch (err) {
-      setError(err.message || 'Something went wrong');
+      setError(err.message || 'Failed to start interview. Please try again.');
+      console.error('Interview error:', err);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleLoginSuccess = () => {
+    if (formDataToSubmit) {
+      startInterview(formDataToSubmit);
+    }
+    setShowAuthModal(false);
+  };
+
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
       <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">
-          AI-Powered Interview Practice
-        </h1>
-        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-          Upload your resume, set your target role, and practice with AI-generated questions. 
-          Get instant feedback and a personalized learning roadmap.
-        </p>
+        <h1 className="text-4xl font-bold text-gray-900 mb-4">AI-Powered Interview Preparation</h1>
+        <p className="text-xl text-gray-600">Practice with realistic interview questions and get instant feedback</p>
       </div>
 
-      <div className="bg-white rounded-lg shadow-lg p-8">
+      <div className="bg-white shadow rounded-lg p-6 mb-8">
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Resume Upload */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Upload Your Resume (PDF)
+            <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">
+              Target Role
+            </label>
+            <input
+              type="text"
+              name="role"
+              id="role"
+              value={formData.role}
+              onChange={handleInputChange}
+              className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="e.g., Software Engineer, Data Scientist"
+              required
+            />
+          </div>
+
+          <div>
+            <label htmlFor="company" className="block text-sm font-medium text-gray-700 mb-1">
+              Target Company (Optional)
+            </label>
+            <input
+              type="text"
+              name="company"
+              id="company"
+              value={formData.company}
+              onChange={handleInputChange}
+              className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="e.g., Google, Microsoft"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Upload Resume (PDF)
             </label>
             <div
               {...getRootProps()}
-              className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-                isDragActive
-                  ? 'border-primary-500 bg-primary-50'
-                  : resumeFile
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-gray-300 hover:border-primary-400 hover:bg-gray-50'
+              className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+                isDragActive ? 'border-indigo-500 bg-indigo-50' : 'border-gray-300 hover:border-indigo-400'
               }`}
             >
               <input {...getInputProps()} />
@@ -157,112 +225,60 @@ const Home = ({ onStartInterview }) => {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                  <Upload className="h-10 w-10 mx-auto text-gray-400" />
                   <p className="text-sm text-gray-600">
-                    {isDragActive
-                      ? 'Drop the PDF here'
-                      : 'Drag and drop a PDF file, or click to select'}
+                    {isDragActive ? 'Drop your resume here' : 'Drag and drop your resume here, or click to select'}
                   </p>
+                  <p className="text-xs text-gray-500">PDF files only (max 5MB)</p>
                 </div>
               )}
             </div>
+            {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
           </div>
 
-          {/* Role and Company Inputs */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-2">
-                Target Role
-              </label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                  type="text"
-                  id="role"
-                  name="role"
-                  value={formData.role}
-                  onChange={handleInputChange}
-                  placeholder="e.g., Software Engineer, Data Scientist"
-                  className="pl-10 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="company" className="block text-sm font-medium text-gray-700 mb-2">
-                Target Company
-              </label>
-              <div className="relative">
-                <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                  type="text"
-                  id="company"
-                  name="company"
-                  value={formData.company}
-                  onChange={handleInputChange}
-                  placeholder="e.g., Google, Microsoft"
-                  className="pl-10 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  required
-                />
-              </div>
-            </div>
+          <div className="pt-2">
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full flex justify-center items-center px-6 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? (
+                'Preparing your interview...'
+              ) : (
+                <>
+                  Start Interview
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </>
+              )}
+            </button>
           </div>
-
-          {/* Error Message */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-md p-4">
-              <p className="text-sm text-red-600">{error}</p>
-            </div>
-          )}
-
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-primary-600 text-white py-3 px-6 rounded-md font-medium hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2"
-          >
-            {isLoading ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                <span>Starting Interview...</span>
-              </>
-            ) : (
-              <>
-                <Play className="h-5 w-5" />
-                <span>Start Interview</span>
-                <ArrowRight className="h-5 w-5" />
-              </>
-            )}
-          </button>
         </form>
       </div>
 
-      {/* Features */}
-      <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
-        <div className="text-center">
-          <div className="bg-primary-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-            <Brain className="h-8 w-8 text-primary-600" />
+      <div className="grid md:grid-cols-3 gap-6 mb-12">
+        <div className="bg-white p-6 rounded-lg shadow">
+          <div className="bg-indigo-100 p-3 rounded-full w-12 h-12 flex items-center justify-center mb-4">
+            <Brain className="h-6 w-6 text-indigo-600" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">AI-Generated Questions</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">AI-Powered Questions</h3>
           <p className="text-gray-600">
-            Get personalized interview questions based on your resume and target role
+            Get personalized questions based on your resume and target role
           </p>
         </div>
 
-        <div className="text-center">
-          <div className="bg-green-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-            <BarChart3 className="h-8 w-8 text-green-600" />
+        <div className="bg-white p-6 rounded-lg shadow">
+          <div className="bg-indigo-100 p-3 rounded-full w-12 h-12 flex items-center justify-center mb-4">
+            <User className="h-6 w-6 text-indigo-600" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Instant Feedback</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Practice Anywhere</h3>
           <p className="text-gray-600">
-            Receive detailed feedback and scoring for each of your answers
+            Access your interviews anytime, from any device
           </p>
         </div>
 
-        <div className="text-center">
-          <div className="bg-purple-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-            <FileText className="h-8 w-8 text-purple-600" />
+        <div className="bg-white p-6 rounded-lg shadow">
+          <div className="bg-indigo-100 p-3 rounded-full w-12 h-12 flex items-center justify-center mb-4">
+            <BarChart3 className="h-6 w-6 text-indigo-600" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Learning Roadmap</h3>
           <p className="text-gray-600">
@@ -270,6 +286,33 @@ const Home = ({ onStartInterview }) => {
           </p>
         </div>
       </div>
+
+      <AuthRequiredModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onLogin={() => {
+          setShowAuthModal(false);
+          navigate('/login', { 
+            state: { 
+              from: { 
+                pathname: '/',
+                state: { formData: formDataToSubmit }
+              } 
+            } 
+          });
+        }}
+        onSignup={() => {
+          setShowAuthModal(false);
+          navigate('/signup', { 
+            state: { 
+              from: { 
+                pathname: '/',
+                state: { formData: formDataToSubmit }
+              } 
+            } 
+          });
+        }}
+      />
     </div>
   );
 };

@@ -1,14 +1,20 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Header from './components/Header';
 import Home from './components/Home';
 import Interview from './components/Interview';
 import Result from './components/Result';
+import LoginPage from './pages/LoginPage';
+import SignupPage from './pages/SignupPage';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 import './App.css';
 
-function App() {
+// Wrapper component to handle protected routes
+const AppContent = () => {
   const [currentSession, setCurrentSession] = useState(null);
   const [interviewData, setInterviewData] = useState(null);
+  const { user } = useAuth();
 
   const startNewInterview = (data) => {
     setInterviewData(data);
@@ -20,41 +26,62 @@ function App() {
   };
 
   return (
-    <Router>
-      <div className="min-h-screen bg-gray-50">
-        <Header />
-        <main className="container mx-auto px-4 py-8">
-          <Routes>
-            <Route 
-              path="/" 
-              element={<Home onStartInterview={startNewInterview} />} 
-            />
-            <Route 
-              path="/interview" 
-              element={
-                interviewData ? (
+    <div className="min-h-screen bg-gray-50">
+      <Header />
+      <main className="container mx-auto px-4 py-8">
+        <Routes>
+          <Route 
+            path="/" 
+            element={<Home onStartInterview={startNewInterview} />} 
+          />
+          <Route 
+            path="/login" 
+            element={<LoginPage />} 
+          />
+          <Route 
+            path="/signup" 
+            element={<SignupPage />} 
+          />
+          <Route
+            path="/interview"
+            element={
+              <ProtectedRoute>
+                {interviewData ? (
                   <Interview 
                     interviewData={interviewData} 
                     onSessionCreated={setSession}
                   />
                 ) : (
                   <Navigate to="/" replace />
-                )
-              } 
-            />
-            <Route 
-              path="/results" 
-              element={
-                currentSession ? (
+                )}
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/results"
+            element={
+              <ProtectedRoute>
+                {currentSession ? (
                   <Result session={currentSession} />
                 ) : (
                   <Navigate to="/" replace />
-                )
-              } 
-            />
-          </Routes>
-        </main>
-      </div>
+                )}
+              </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
+    </div>
+  );
+};
+
+function App() {
+  return (
+    <Router>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </Router>
   );
 }

@@ -1,5 +1,5 @@
-from .common import feedback_llm
-from .models import InterviewState
+from common import feedback_llm
+from models import InterviewState
 from langchain_core.messages import SystemMessage, HumanMessage
 
 def generate_feedback(question: str, answer: str, role: str, company: str) -> dict:

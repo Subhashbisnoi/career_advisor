@@ -59,11 +59,18 @@ const Interview = ({ interviewData, onSessionCreated }) => {
     setError('');
 
     try {
+      // Get auth token
+      const token = localStorage.getItem('token');
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/interview/submit-answers`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           session_id: interviewData.session_id,
           answers: answers

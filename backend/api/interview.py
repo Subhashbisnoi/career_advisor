@@ -1,17 +1,27 @@
+import uuid
 from fastapi import APIRouter, File, UploadFile, HTTPException, Depends
 from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
+from datetime import datetime
 import os
 import tempfile
 from pathlib import Path
 from typing import List, Dict, Any
 import json
 
-# Use relative imports since we're in a package
-from ..models import InterviewState
-from ..common import extract_resume_text
-from ..generator import generate_question
-from ..feedback import feedback_generator
-from ..roadmap import generate_roadmap
+# Import from the parent directory
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from models import InterviewState, InterviewSession, ChatMessage, User
+from database import get_db
+from common import extract_resume_text
+from generator import generate_question
+from feedback import feedback_generator
+from roadmap import generate_roadmap
+
+# Import authentication
+from api.auth import get_current_user
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
 
@@ -76,7 +86,11 @@ async def upload_resume(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
 
 @router.post("/start")
-async def start_interview(interview_data: Dict[str, Any]):
+async def start_interview(
+    interview_data: Dict[str, Any], 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """Start a new interview session by generating questions only."""
     try:
         role = interview_data.get("role")
@@ -105,8 +119,33 @@ async def start_interview(interview_data: Dict[str, Any]):
         if not questions or len(questions) < 3:
             raise HTTPException(status_code=500, detail="Failed to generate interview questions")
         
-        # Create session
-        session_id = f"session_{len(interview_sessions) + 1}"
+        # Create unique session ID
+        session_id = f"session_{uuid.uuid4().hex[:8]}"
+        
+        # Ensure uniqueness in database (double-check for safety)
+        existing_count = 0
+        while db.query(InterviewSession).filter(InterviewSession.thread_id == session_id).first():
+            existing_count += 1
+            session_id = f"session_{uuid.uuid4().hex[:8]}"
+            # Prevent infinite loop (though extremely unlikely with UUID)
+            if existing_count > 10:
+                session_id = f"session_{uuid.uuid4().hex}"
+                break
+        
+        # Create database session
+        db_session = InterviewSession(
+            user_id=current_user.id,  # Link to the authenticated user
+            thread_id=session_id,
+            role=role,
+            company=company,
+            status="in_progress",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        db.add(db_session)
+        db.commit()
+        
+        # Store in memory for the duration of the interview
         interview_sessions[session_id] = {
             "state": initial_state,
             "questions": questions,
@@ -122,23 +161,40 @@ async def start_interview(interview_data: Dict[str, Any]):
     except HTTPException:
         raise
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=f"Error starting interview: {str(e)}")
 
 @router.post("/submit-answers")
-async def submit_answers(session_data: Dict[str, Any]):
+async def submit_answers(
+    session_data: Dict[str, Any], 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """Submit all answers and generate feedback and roadmap."""
     try:
         session_id = session_data.get("session_id")
-        if not session_id or session_id not in interview_sessions:
+        if not session_id:
+            raise HTTPException(status_code=400, detail="Session ID is required")
+        
+        # Check if session exists in database and belongs to the user
+        session = db.query(InterviewSession).filter(
+            InterviewSession.thread_id == session_id,
+            InterviewSession.user_id == current_user.id
+        ).first()
+        if not session:
             raise HTTPException(status_code=404, detail="Session not found")
         
         answers: List[str] = session_data.get("answers", [])
         if len(answers) != 3:
             raise HTTPException(status_code=400, detail="Exactly 3 answers are required")
         
-        session = interview_sessions[session_id]
-        questions: List[str] = session.get("questions", [])
-        state: InterviewState = session.get("state", {})  # type: ignore
+        # Get questions from in-memory storage for now (we can improve this later)
+        if session_id not in interview_sessions:
+            raise HTTPException(status_code=404, detail="Session questions not found")
+            
+        session_data_memory = interview_sessions[session_id]
+        questions: List[str] = session_data_memory.get("questions", [])
+        state: InterviewState = session_data_memory.get("state", {})  # type: ignore
         
         complete_state: InterviewState = {
             **state,
@@ -151,41 +207,81 @@ async def submit_answers(session_data: Dict[str, Any]):
         feedback_items = feedback_result.get("feedback", [])
         complete_state["feedback"] = feedback_items
         
-        # Debug: Print feedback items
-        print("\n" + "="*80)
-        print("FEEDBACK ITEMS:")
-        print("="*80)
-        print(f"Number of feedback items: {len(feedback_items)}")
-        for i, item in enumerate(feedback_items):
-            print(f"\nFeedback {i+1}:")
-            print(f"- Feedback: {item.get('feedback', 'No feedback')}")
-            print(f"- Marks: {item.get('marks', 0)}")
-        print("="*80 + "\n")
-        
         # Generate roadmap with the complete state including feedback
-        print("\n" + "="*80)
-        print("GENERATING ROADMAP...")
-        print("="*80)
-        print(f"Complete state keys: {complete_state.keys()}")
-        print(f"Feedback in complete_state: {bool(complete_state.get('feedback'))}")
-        print("="*80 + "\n")
-        
         roadmap_result = generate_roadmap(complete_state)
         complete_state["roadmap"] = roadmap_result.get("roadmap", "")
 
-        # Persist results in session
-        interview_sessions[session_id]["results"] = {
-            "feedback": complete_state["feedback"],
-            "roadmap": complete_state["roadmap"],
-        }
+        # Store questions in database as chat messages
+        for i, question in enumerate(questions):
+            question_msg = ChatMessage(
+                session_id=session.id,  # Use the session's primary key
+                thread_id=session_id,   # Store the thread_id for reference
+                role="assistant",
+                content=question,
+                message_type="question",
+                question_number=i + 1,
+                created_at=datetime.utcnow()
+            )
+            db.add(question_msg)
         
-        total_score = sum([f.get("marks", 0) for f in complete_state["feedback"]])
-        avg_score = total_score / len(complete_state["feedback"]) if complete_state["feedback"] else 0
+        # Store answers and feedback in database as chat messages
+        total_score = 0
+        for i, (answer, feedback_item) in enumerate(zip(answers, feedback_items)):
+            # Store answer
+            answer_msg = ChatMessage(
+                session_id=session.id,  # Use the session's primary key
+                thread_id=session_id,   # Store the thread_id for reference
+                role="user",
+                content=answer,
+                message_type="answer",
+                question_number=i + 1,
+                created_at=datetime.utcnow()
+            )
+            db.add(answer_msg)
+            
+            # Store feedback
+            feedback_msg = ChatMessage(
+                session_id=session.id,  # Use the session's primary key
+                thread_id=session_id,   # Store the thread_id for reference
+                role="assistant",
+                content=feedback_item.get('feedback', ''),
+                message_type="feedback",
+                question_number=i + 1,
+                marks=feedback_item.get('marks', 0),
+                created_at=datetime.utcnow()
+            )
+            db.add(feedback_msg)
+            total_score += feedback_item.get('marks', 0)
+        
+        # Store roadmap
+        roadmap_msg = ChatMessage(
+            session_id=session.id,  # Use the session's primary key
+            thread_id=session_id,   # Store the thread_id for reference
+            role="assistant",
+            content=complete_state["roadmap"],
+            message_type="roadmap",
+            created_at=datetime.utcnow()
+        )
+        db.add(roadmap_msg)
+        
+        # Update session status and scores
+        avg_score = total_score / len(feedback_items) if feedback_items else 0
+        session.status = "completed"
+        session.total_score = total_score
+        session.average_score = avg_score
+        session.updated_at = datetime.utcnow()
+        session.completed_at = datetime.utcnow()
+        
+        db.commit()
+
+        # Clean up in-memory session
+        if session_id in interview_sessions:
+            del interview_sessions[session_id]
 
         return {
             "message": "Interview completed successfully",
             "session_id": session_id,
-            "feedback": complete_state["feedback"],
+            "feedback": feedback_items,
             "roadmap": complete_state["roadmap"],
             "total_score": total_score,
             "average_score": avg_score,
@@ -193,15 +289,54 @@ async def submit_answers(session_data: Dict[str, Any]):
     except HTTPException:
         raise
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=f"Error completing interview: {str(e)}")
 
 @router.get("/session/{session_id}")
-async def get_session(session_id: str):
+async def get_session(session_id: str, db: Session = Depends(get_db)):
     """Get interview session details."""
-    if session_id not in interview_sessions:
+    session = db.query(InterviewSession).filter(InterviewSession.thread_id == session_id).first()
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
-    session = interview_sessions[session_id]
+    return {
+        "session_id": session.thread_id,
+        "role": session.role,
+        "company": session.company,
+        "status": session.status,
+        "total_score": session.total_score,
+        "average_score": session.average_score,
+        "created_at": session.created_at,
+        "updated_at": session.updated_at
+    }
+
+@router.get("/session/{session_id}/chat")
+async def get_session_chat_history(session_id: str, db: Session = Depends(get_db)):
+    """Get chat history for a specific session."""
+    # Check if session exists
+    session = db.query(InterviewSession).filter(InterviewSession.thread_id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Get all chat messages for this session using the session's primary key
+    messages = db.query(ChatMessage).filter(
+        ChatMessage.session_id == session.id
+    ).order_by(ChatMessage.created_at.asc()).all()
+    
+    return {
+        "session_id": session_id,
+        "messages": [
+            {
+                "role": msg.role,
+                "content": msg.content,
+                "type": msg.message_type,
+                "question_number": msg.question_number,
+                "marks": msg.marks,
+                "timestamp": msg.created_at.isoformat()
+            }
+            for msg in messages
+        ]
+    }
     return {
         "session_id": session_id,
         "questions": session.get("questions", []),
@@ -209,14 +344,143 @@ async def get_session(session_id: str):
     }
 
 @router.get("/sessions")
-async def list_sessions():
-    """List all interview sessions."""
-    return {
-        "sessions": [
-            {
-                "session_id": session_id,
-                "has_results": "results" in session
+async def list_sessions(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """List all interview sessions for the current user."""
+    try:
+        # Get all sessions for the current user
+        sessions = db.query(InterviewSession).filter(
+            InterviewSession.user_id == current_user.id
+        ).order_by(InterviewSession.created_at.desc()).all()
+        
+        print(f"DEBUG: Found {len(sessions)} sessions for user {current_user.email}")
+        
+        # Format sessions for the frontend
+        formatted_sessions = []
+        for session in sessions:
+            # Check if session has feedback messages (completed)
+            has_feedback = db.query(ChatMessage).filter(
+                ChatMessage.session_id == session.id,
+                ChatMessage.message_type == "feedback"
+            ).first() is not None
+            
+            print(f"DEBUG: Session {session.thread_id} - status: {session.status}, has_feedback: {has_feedback}, score: {session.average_score}")
+            
+            session_data = {
+                "thread_id": session.thread_id,  # Use thread_id for frontend consistency
+                "session_id": session.thread_id,  # Keep session_id for backward compatibility
+                "created_at": session.created_at.isoformat(),
+                "status": "completed" if has_feedback else "in_progress",
+                "score": session.average_score if session.average_score > 0 else None,
+                "company": session.company,
+                "role": session.role,
+                "has_results": has_feedback
             }
-            for session_id, session in interview_sessions.items()
-        ]
-    }
+            
+            formatted_sessions.append(session_data)
+        
+        print(f"DEBUG: Returning {len(formatted_sessions)} formatted sessions")
+        return {"sessions": formatted_sessions}
+        
+    except Exception as e:
+        print(f"Error fetching sessions: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch sessions")
+
+@router.get("/analytics")
+async def get_analytics(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get analytics for the current user."""
+    try:
+        # Get all sessions for the current user
+        sessions = db.query(InterviewSession).filter(
+            InterviewSession.user_id == current_user.id
+        ).all()
+        
+        print(f"DEBUG: Found {len(sessions)} sessions for user {current_user.email}")
+        
+        total_interviews = len(sessions)
+        
+        # Get completed sessions (those with feedback)
+        completed_sessions = []
+        companies = set()
+        roles = set()
+        
+        for session in sessions:
+            print(f"DEBUG: Session {session.thread_id} - status: {session.status}, avg_score: {session.average_score}")
+            
+            companies.add(session.company)
+            roles.add(session.role)
+            
+            # Check if session has feedback (is completed)
+            has_feedback = db.query(ChatMessage).filter(
+                ChatMessage.session_id == session.id,
+                ChatMessage.message_type == "feedback"
+            ).first() is not None
+            
+            print(f"DEBUG: Session {session.thread_id} has_feedback: {has_feedback}")
+            
+            if has_feedback:
+                completed_sessions.append(session)
+        
+        completed_interviews = len(completed_sessions)
+        
+        print(f"DEBUG: Completed sessions: {completed_interviews}")
+        
+        # Calculate average and best scores from completed sessions
+        scores = [session.average_score for session in completed_sessions if session.average_score > 0]
+        average_score = sum(scores) / len(scores) if scores else 0
+        best_score = max(scores) if scores else 0
+        
+        print(f"DEBUG: Scores: {scores}, avg: {average_score}, best: {best_score}")
+        
+        return {
+            "total_interviews": total_interviews,
+            "completed_interviews": completed_interviews,
+            "average_score": round(average_score, 1),
+            "best_score": round(best_score, 1),
+            "companies": list(companies),
+            "roles": list(roles)
+        }
+        
+    except Exception as e:
+        print(f"Error fetching analytics: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch analytics")
+
+@router.delete("/session/{session_id}")
+async def delete_session(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete an interview session."""
+    try:
+        # Find the session for the current user
+        session = db.query(InterviewSession).filter(
+            InterviewSession.thread_id == session_id,
+            InterviewSession.user_id == current_user.id
+        ).first()
+        
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        # Delete associated chat messages first
+        db.query(ChatMessage).filter(
+            ChatMessage.session_id == session.id
+        ).delete()
+        
+        # Delete the session
+        db.delete(session)
+        db.commit()
+        
+        return {"message": "Session deleted successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error deleting session: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete session")

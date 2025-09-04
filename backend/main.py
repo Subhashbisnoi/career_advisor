@@ -8,10 +8,18 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.append(current_dir)
 
-# Import the routers
-from backend.api.interview import router as interview_router
-from backend.api.tts import router as tts_router
-from backend.api.voice import router as voice_router
+# Initialize database before importing routers
+from database import Base, engine
+
+# Create tables
+Base.metadata.create_all(bind=engine)
+
+# Import the routers after database initialization
+from api.interview import router as interview_router
+from api.interview_v2 import router as interview_v2_router
+from api.tts import router as tts_router
+from api.voice import router as voice_router
+from api.auth import router as auth_router
 
 app = FastAPI()
 
@@ -25,7 +33,9 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(auth_router, prefix="/auth", tags=["authentication"])
 app.include_router(interview_router)
+app.include_router(interview_v2_router)
 app.include_router(tts_router)
 app.include_router(voice_router)
 
@@ -45,5 +55,5 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
 

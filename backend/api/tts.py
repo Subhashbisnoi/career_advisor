@@ -19,8 +19,7 @@ class TextToSpeechRequest(BaseModel):
 def text_to_speech_with_gtts(input_text: str, language: str = "en") -> str:
     """Convert text to speech and return the path to the audio file"""
     if not input_text.strip():
-        raise ValueError("Input text cannot be empty")
-    
+        raise ValueError("Input text cannot be empty")  
     try:
         # Create a unique filename for each request
         filename = f"{uuid.uuid4()}.mp3"

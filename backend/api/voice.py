@@ -1,6 +1,12 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
-from ..interviewee_voice import interviewee_voice_processor
+import os
+import sys
+
+# Add the parent directory to sys.path for imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from interviewee_voice import interviewee_voice_processor
 
 router = APIRouter(prefix="/voice", tags=["voice"])
 

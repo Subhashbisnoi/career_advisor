@@ -10,6 +10,8 @@ An AI-powered interview practice application that generates personalized questio
 - **Learning Roadmap**: Get a personalized plan to improve your skills
 - **Resume Analysis**: Upload PDF resumes for AI analysis
 - **Session Management**: Track your interview sessions and progress
+- **User Authentication**: Secure login/signup with email or Google OAuth
+- **Google Sign-In**: Quick authentication using your Google account
 
 ## Architecture
 
@@ -58,19 +60,54 @@ interviewer/
 
 ### 1. Environment Setup
 
-Create a `.env` file in the backend directory:
+Create environment files in both directories:
 
+#### Backend Environment
 ```bash
 cd backend
 cp .env.example .env
 ```
 
-Edit `.env` with your API keys:
+Edit `backend/.env` with your configuration:
 
 ```env
+# Database
+DATABASE_URL=sqlite:///./interviewer.db
+
+# JWT Configuration
+SECRET_KEY=your-super-secret-key-here-change-in-production
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=1440
+
+# Google OAuth (Optional - for Google Sign-In)
+GOOGLE_CLIENT_ID=your-google-client-id-here
+
+# OpenAI API
 OPENAI_API_KEY=your_openai_api_key_here
 OPENAI_BASE_URL=https://openrouter.ai/api/v1  # Optional: for OpenRouter
+
+# Environment
+ENVIRONMENT=development
+DEBUG=True
 ```
+
+#### Frontend Environment
+```bash
+cd frontend
+cp .env.example .env
+```
+
+Edit `frontend/.env` with your configuration:
+
+```env
+REACT_APP_API_URL=http://localhost:8000
+
+# Google OAuth (Optional - for Google Sign-In)
+REACT_APP_GOOGLE_CLIENT_ID=your-google-client-id-here
+```
+
+#### Google OAuth Setup (Optional)
+If you want to enable Google Sign-In, follow the detailed instructions in `GOOGLE_OAUTH_SETUP.md`.
 
 ### 2. Backend Setup
 
@@ -105,14 +142,21 @@ The frontend will run on `http://localhost:3000`
 
 ## Usage
 
-1. **Upload Resume**: Upload your PDF resume
-2. **Set Target**: Specify your target role and company
-3. **Start Interview**: AI generates personalized questions
-4. **Answer Questions**: Provide detailed answers to each question
-5. **Get Feedback**: Receive instant feedback and scoring
-6. **View Roadmap**: Get a personalized learning plan
+1. **Sign Up/Login**: Create an account or sign in with email/password or Google
+2. **Upload Resume**: Upload your PDF resume
+3. **Set Target**: Specify your target role and company
+4. **Start Interview**: AI generates personalized questions
+5. **Answer Questions**: Provide detailed answers to each question
+6. **Get Feedback**: Receive instant feedback and scoring
+7. **View Roadmap**: Get a personalized learning plan
 
 ## API Endpoints
+
+### Authentication
+- `POST /auth/signup` - Create new user account
+- `POST /auth/login` - User login with email/password
+- `POST /auth/google` - Google OAuth authentication
+- `GET /auth/me` - Get current user profile
 
 ### Interview Management
 - `POST /interview/upload-resume` - Upload resume PDF
