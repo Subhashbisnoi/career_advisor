@@ -1,7 +1,8 @@
-// API Configuration
-export const API_URL = process.env.REACT_APP_API_URL || 'https://career-advisor-backend-yies.onrender.com';
+// API Configuration - Hardcoded for production reliability
+const API_URL = 'https://career-advisor-backend-yies.onrender.com';
 
-// Make sure we always have a valid API URL
+// Log for debugging
 console.log('[API CONFIG] Using API URL:', API_URL);
 
+export { API_URL };
 export default API_URL;

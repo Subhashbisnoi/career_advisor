@@ -5,6 +5,7 @@ import {
   User, Calendar, ArrowRight, RefreshCw, Plus, Star, Briefcase,
   Zap, Users, Building, DollarSign, ChevronRight
 } from 'lucide-react';
+import { API_URL } from '../config/api';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -22,7 +23,7 @@ const Dashboard = () => {
       console.log('[DASHBOARD DEBUG] Token exists:', !!token);
       
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/assessment/dashboard`,
+        `${API_URL}/assessment/dashboard`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,

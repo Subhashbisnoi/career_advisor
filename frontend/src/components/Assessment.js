@@ -5,6 +5,7 @@ import {
   BarChart3, Target, Users, TrendingUp 
 } from 'lucide-react';
 import { makeAuthenticatedRequest } from '../services/auth';
+import { API_URL } from '../config/api';
 
 const Assessment = ({ assessmentData, onAssessmentCreated, onResultsGenerated }) => {
   const navigate = useNavigate();
@@ -89,7 +90,7 @@ const Assessment = ({ assessmentData, onAssessmentCreated, onResultsGenerated })
       console.log('[FRONTEND DEBUG] Formatted responses:', formattedResponses);
 
       // Submit assessment responses using authenticated request helper
-      const submitUrl = `${process.env.REACT_APP_API_URL || 'https://career-advisor-backend-yies.onrender.com'}/assessment/submit-responses`;
+      const submitUrl = `${API_URL}/assessment/submit-responses`;
       console.log('[FRONTEND DEBUG] Submit URL:', submitUrl);
       
       // Create request body matching the backend's expected format
@@ -121,7 +122,7 @@ const Assessment = ({ assessmentData, onAssessmentCreated, onResultsGenerated })
         // Generate career recommendations first
         console.log('[FRONTEND DEBUG] Generating career recommendations...');
         
-        const recommendationsUrl = `${process.env.REACT_APP_API_URL || 'https://career-advisor-backend-yies.onrender.com'}/careers/recommendations`;
+        const recommendationsUrl = `${API_URL}/careers/recommendations`;
         const recommendationsResponse = await makeAuthenticatedRequest(recommendationsUrl, {
           method: 'POST',
           body: JSON.stringify({
@@ -141,7 +142,7 @@ const Assessment = ({ assessmentData, onAssessmentCreated, onResultsGenerated })
         // Get the full results including career recommendations
         console.log('[FRONTEND DEBUG] Getting assessment results...');
         
-        const resultsUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/assessment/results/${submitResult.assessment_id}`;
+        const resultsUrl = `${API_URL}/assessment/results/${submitResult.assessment_id}`;
         const resultsResponse = await makeAuthenticatedRequest(resultsUrl, {
           method: 'GET'
         });
@@ -181,7 +182,7 @@ const Assessment = ({ assessmentData, onAssessmentCreated, onResultsGenerated })
         console.log('[FRONTEND DEBUG] Assessment still processing, trying career recommendations...');
         
         // Try to generate career recommendations anyway
-        const recommendationsUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/careers/recommendations`;
+        const recommendationsUrl = `${API_URL}/careers/recommendations`;
         console.log('[FRONTEND DEBUG] Recommendations URL:', recommendationsUrl);
         
         const recommendationsResponse = await makeAuthenticatedRequest(recommendationsUrl, {

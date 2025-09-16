@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import AuthModal from './auth/AuthModal';
+import { API_URL } from '../config/api';
 
 const Home = ({ onStartAssessment }) => {
   const navigate = useNavigate();
@@ -116,7 +117,7 @@ const Home = ({ onStartAssessment }) => {
 
       // Start career assessment
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/assessment/start`,
+        `${API_URL}/assessment/start`,
         {
           method: 'POST',
           headers,
