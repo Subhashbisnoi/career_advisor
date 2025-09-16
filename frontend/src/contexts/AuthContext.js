@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { login as loginApi, signup as signupApi, googleAuth as googleAuthApi, getCurrentUser } from '../services/auth';
+import { login as loginApi, signup as signupApi, googleAuth as googleAuthApi, githubAuth as githubAuthApi, getCurrentUser } from '../services/auth';
 
 const AuthContext = createContext(null);
 
@@ -34,7 +34,7 @@ export const AuthProvider = ({ children }) => {
       const { user: userData, token } = await loginApi(email, password);
       localStorage.setItem('token', token);
       setUser(userData);
-      navigate('/'); // Navigate to home after successful login
+      // Don't navigate automatically - let components handle it
       return { success: true };
     } catch (error) {
       console.error('Login failed:', error);
@@ -50,7 +50,7 @@ export const AuthProvider = ({ children }) => {
       if (response.access_token && response.user) {
         localStorage.setItem('token', response.access_token);
         setUser(response.user);
-        navigate('/'); // Navigate to home after successful signup
+        // Don't navigate automatically - let components handle it
         return { success: true };
       }
       
@@ -66,10 +66,23 @@ export const AuthProvider = ({ children }) => {
       const { user: userData, token } = await googleAuthApi(credential);
       localStorage.setItem('token', token);
       setUser(userData);
-      navigate('/');
+      // Don't navigate automatically - let components handle it
       return { success: true };
     } catch (error) {
       console.error('Google login failed:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  const githubLogin = async (code) => {
+    try {
+      const { user: userData, token } = await githubAuthApi(code);
+      localStorage.setItem('token', token);
+      setUser(userData);
+      // Don't navigate automatically - let components handle it
+      return { success: true };
+    } catch (error) {
+      console.error('GitHub login failed:', error);
       return { success: false, error: error.message };
     }
   };
@@ -81,7 +94,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, googleLogin, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, googleLogin, githubLogin, logout }}>
       {!loading && children}
     </AuthContext.Provider>
   );

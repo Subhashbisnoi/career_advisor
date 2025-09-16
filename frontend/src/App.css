@@ -45,3 +45,12 @@
   .roadmap-content li {
     margin-bottom: 0.5rem;
   }
+
+  /* Line clamp utilities for text truncation */
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }

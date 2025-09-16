@@ -86,11 +86,13 @@ const Interview = ({ interviewData, onSessionCreated }) => {
       // Pass the complete session data to parent
       onSessionCreated({
         ...interviewData,
+        thread_id: interviewData.session_id, // Add thread_id for pin functionality
         answers: answers,
         feedback: result.feedback,
         roadmap: result.roadmap,
         total_score: result.total_score,
-        average_score: result.average_score
+        average_score: result.average_score,
+        is_pinned: false // Default to not pinned
       });
 
       navigate('/results');

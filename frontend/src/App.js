@@ -1,55 +1,111 @@
-import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Header from './components/Header';
 import Home from './components/Home';
-import Interview from './components/Interview';
-import Result from './components/Result';
-import LoginPage from './pages/LoginPage';
-import SignupPage from './pages/SignupPage';
+import Assessment from './components/Assessment';
+import Results from './components/Results';
+import Dashboard from './components/Dashboard';
+import CareerRoadmap from './components/CareerRoadmap';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import './App.css';
 
+// Component to handle OAuth callbacks
+const OAuthHandler = () => {
+  const { githubLogin } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const handleGitHubCallback = async () => {
+      const urlParams = new URLSearchParams(location.search);
+      const code = urlParams.get('code');
+      const state = urlParams.get('state');
+      
+      if (code && state === 'github-auth') {
+        try {
+          console.log('Handling GitHub OAuth callback with code:', code);
+          const result = await githubLogin(code);
+          
+          // Clean up URL parameters
+          window.history.replaceState({}, document.title, window.location.pathname);
+          
+          if (result.success) {
+            console.log('GitHub login successful, navigating to home');
+            navigate('/', { replace: true });
+          } else {
+            console.error('GitHub login failed:', result.error);
+            // Stay on current page and show error
+          }
+        } catch (error) {
+          console.error('GitHub OAuth callback error:', error);
+          // Stay on current page and show error
+        }
+      }
+    };
+
+    handleGitHubCallback();
+  }, [location.search, githubLogin, navigate]);
+
+  return null; // This component doesn't render anything
+};
+
 // Wrapper component to handle protected routes
 const AppContent = () => {
-  const [currentSession, setCurrentSession] = useState(null);
-  const [interviewData, setInterviewData] = useState(null);
+  const [currentAssessment, setCurrentAssessment] = useState(null);
+  const [assessmentData, setAssessmentData] = useState(null);
+  const [careerResults, setCareerResults] = useState(null);
   const { user } = useAuth();
 
-  const startNewInterview = (data) => {
-    setInterviewData(data);
-    setCurrentSession(null);
+  const startNewAssessment = (data) => {
+    setAssessmentData(data);
+    setCurrentAssessment(null);
+    setCareerResults(null);
   };
 
-  const setSession = (session) => {
-    setCurrentSession(session);
+  const setAssessment = (assessment) => {
+    setCurrentAssessment(assessment);
+  };
+
+  const setResults = (results) => {
+    setCareerResults(results);
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <OAuthHandler />
       <Header />
       <main className="container mx-auto px-4 py-8">
         <Routes>
           <Route 
             path="/" 
-            element={<Home onStartInterview={startNewInterview} />} 
-          />
-          <Route 
-            path="/login" 
-            element={<LoginPage />} 
-          />
-          <Route 
-            path="/signup" 
-            element={<SignupPage />} 
+            element={<Home onStartAssessment={startNewAssessment} />} 
           />
           <Route
-            path="/interview"
+            path="/dashboard"
             element={
               <ProtectedRoute>
-                {interviewData ? (
-                  <Interview 
-                    interviewData={interviewData} 
-                    onSessionCreated={setSession}
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/roadmap"
+            element={
+              <ProtectedRoute>
+                <CareerRoadmap />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/assessment"
+            element={
+              <ProtectedRoute>
+                {assessmentData ? (
+                  <Assessment 
+                    assessmentData={assessmentData} 
+                    onAssessmentCreated={setAssessment}
+                    onResultsGenerated={setResults}
                   />
                 ) : (
                   <Navigate to="/" replace />
@@ -61,8 +117,8 @@ const AppContent = () => {
             path="/results"
             element={
               <ProtectedRoute>
-                {currentSession ? (
-                  <Result session={currentSession} />
+                {careerResults ? (
+                  <Results results={careerResults} />
                 ) : (
                   <Navigate to="/" replace />
                 )}

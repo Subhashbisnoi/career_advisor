@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Home, Download, Star, TrendingUp, Target, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import PinButton from './PinButton';
 
 const Result = ({ session }) => {
   const [activeTab, setActiveTab] = useState('feedback');
@@ -70,6 +71,16 @@ ${session.roadmap}
             </p>
           </div>
           <div className="flex items-center space-x-4">
+            <PinButton 
+              sessionId={session.thread_id} 
+              isPinned={session.is_pinned || false}
+              onPinChange={(sessionId, isPinned) => {
+                // Update the session object if needed
+                if (session.thread_id === sessionId) {
+                  session.is_pinned = isPinned;
+                }
+              }}
+            />
             <button
               onClick={downloadResults}
               className="flex items-center space-x-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"

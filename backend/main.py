@@ -15,8 +15,10 @@ from database import Base, engine
 Base.metadata.create_all(bind=engine)
 
 # Import the routers after database initialization
-from api.interview import router as interview_router
-from api.interview_v2 import router as interview_v2_router
+from api.assessment import router as assessment_router
+from api.skills import router as skills_router
+from api.careers import router as careers_router
+from api.roadmap import router as roadmap_router
 from api.tts import router as tts_router
 from api.voice import router as voice_router
 from api.auth import router as auth_router
@@ -34,23 +36,32 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth_router, prefix="/auth", tags=["authentication"])
-app.include_router(interview_router)
-app.include_router(interview_v2_router)
+app.include_router(assessment_router)
+app.include_router(skills_router)
+app.include_router(careers_router)
+app.include_router(roadmap_router)
 app.include_router(tts_router)
 app.include_router(voice_router)
 
 # Basic routes
 @app.get("/")
 async def root():
-    return {"message": "AI Interviewer API is running"}
+    return {"message": "Career Advisor API is running"}
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
     return {
         "status": "healthy", 
-        "message": "AI Interviewer API is running",
-        "version": "1.0.0"
+        "message": "Personalized Career and Skills Advisor API is running",
+        "version": "2.0.0",
+        "features": [
+            "Career Assessment",
+            "Skills Analysis", 
+            "Career Recommendations",
+            "Learning Roadmaps",
+            "Market Trends"
+        ]
     }
 
 if __name__ == "__main__":

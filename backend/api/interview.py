@@ -337,11 +337,6 @@ async def get_session_chat_history(session_id: str, db: Session = Depends(get_db
             for msg in messages
         ]
     }
-    return {
-        "session_id": session_id,
-        "questions": session.get("questions", []),
-        "results": session.get("results", {})
-    }
 
 @router.get("/sessions")
 async def list_sessions(
@@ -376,7 +371,8 @@ async def list_sessions(
                 "score": session.average_score if session.average_score > 0 else None,
                 "company": session.company,
                 "role": session.role,
-                "has_results": has_feedback
+                "has_results": has_feedback,
+                "is_pinned": session.is_pinned
             }
             
             formatted_sessions.append(session_data)
@@ -484,3 +480,108 @@ async def delete_session(
         db.rollback()
         print(f"Error deleting session: {e}")
         raise HTTPException(status_code=500, detail="Failed to delete session")
+
+@router.post("/pin/{session_id}")
+async def pin_interview_session(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Pin an interview session."""
+    try:
+        # Find the session for the current user
+        session = db.query(InterviewSession).filter(
+            InterviewSession.thread_id == session_id,
+            InterviewSession.user_id == current_user.id
+        ).first()
+        
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        # Pin the session
+        session.is_pinned = True
+        db.commit()
+        
+        return {"message": "Session pinned successfully", "is_pinned": True}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error pinning session: {e}")
+        raise HTTPException(status_code=500, detail="Failed to pin session")
+
+@router.post("/unpin/{session_id}")
+async def unpin_interview_session(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Unpin an interview session."""
+    try:
+        # Find the session for the current user
+        session = db.query(InterviewSession).filter(
+            InterviewSession.thread_id == session_id,
+            InterviewSession.user_id == current_user.id
+        ).first()
+        
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        # Unpin the session
+        session.is_pinned = False
+        db.commit()
+        
+        return {"message": "Session unpinned successfully", "is_pinned": False}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error unpinning session: {e}")
+        raise HTTPException(status_code=500, detail="Failed to unpin session")
+
+@router.get("/pinned")
+async def get_pinned_sessions(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get all pinned interview sessions for the current user."""
+    try:
+        sessions = db.query(InterviewSession).filter(
+            InterviewSession.user_id == current_user.id,
+            InterviewSession.is_pinned == True
+        ).order_by(InterviewSession.updated_at.desc()).all()
+        
+        sessions_data = []
+        for session in sessions:
+            # Get the last few messages for context
+            messages = db.query(ChatMessage).filter(
+                ChatMessage.session_id == session.id
+            ).order_by(ChatMessage.created_at.desc()).limit(10).all()
+            
+            # Extract feedback and roadmap if available
+            feedback_msg = next((msg for msg in messages if msg.message_type == "feedback"), None)
+            roadmap_msg = next((msg for msg in messages if msg.message_type == "roadmap"), None)
+            
+            session_data = {
+                "thread_id": session.thread_id,
+                "session_id": session.id,
+                "role": session.role,
+                "company": session.company,
+                "status": session.status,
+                "total_score": session.total_score,
+                "average_score": session.average_score,
+                "is_pinned": session.is_pinned,
+                "created_at": session.created_at,
+                "completed_at": session.completed_at,
+                "feedback": feedback_msg.content if feedback_msg else None,
+                "roadmap": roadmap_msg.content if roadmap_msg else None
+            }
+            sessions_data.append(session_data)
+        
+        return {"pinned_sessions": sessions_data}
+        
+    except Exception as e:
+        print(f"Error fetching pinned sessions: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch pinned sessions")
