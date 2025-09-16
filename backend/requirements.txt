@@ -6,9 +6,9 @@ python-multipart==0.0.12
 # Environment and configuration
 python-dotenv==1.0.1
 
-# AI and Language Models
+# AI and Language Models - Fixed dependency compatibility
 langchain-openai==0.2.8
-langchain-core==0.3.15
+langchain-core>=0.3.17,<0.4.0
 langgraph==0.2.34
 openai==1.51.2
 
@@ -21,7 +21,7 @@ pypdfium2==4.30.0
 pydantic==2.9.2
 
 # Database - Updated for Python 3.11+ compatibility
-sqlalchemy==2.0.35
+sqlalchemy>=2.0.35,<2.1.0
 alembic==1.13.3
 psycopg2-binary==2.9.9
 
