@@ -19,7 +19,6 @@ from api.assessment import router as assessment_router
 from api.skills import router as skills_router
 from api.careers import router as careers_router
 from api.roadmap import router as roadmap_router
-from api.voice import router as voice_router
 from api.auth import router as auth_router
 
 app = FastAPI()
@@ -39,7 +38,6 @@ app.include_router(assessment_router)
 app.include_router(skills_router)
 app.include_router(careers_router)
 app.include_router(roadmap_router)
-app.include_router(voice_router)
 
 # Basic routes
 @app.get("/")
