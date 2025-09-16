@@ -22,9 +22,10 @@ const GoogleAuthButton = ({ text = "Continue with Google" }) => {
     
     script.onload = () => {
       // Initialize Google Sign-In
-      if (window.google && process.env.REACT_APP_GOOGLE_CLIENT_ID) {
+      const clientId = process.env.REACT_APP_GOOGLE_CLIENT_ID || '300902081457-9kfrv1j0o87gqvm9o7bdn05cp5f817ee.apps.googleusercontent.com';
+      if (window.google && clientId) {
         window.google.accounts.id.initialize({
-          client_id: process.env.REACT_APP_GOOGLE_CLIENT_ID,
+          client_id: clientId,
           callback: handleCredentialResponse,
         });
 
@@ -34,7 +35,7 @@ const GoogleAuthButton = ({ text = "Continue with Google" }) => {
             theme: "outline",
             size: "large",
             text: "continue_with",
-            width: "100%",
+            width: 400,
           });
         }
       }
@@ -51,7 +52,9 @@ const GoogleAuthButton = ({ text = "Continue with Google" }) => {
     };
   }, []);
 
-  if (!process.env.REACT_APP_GOOGLE_CLIENT_ID) {
+  const clientId = process.env.REACT_APP_GOOGLE_CLIENT_ID || '300902081457-9kfrv1j0o87gqvm9o7bdn05cp5f817ee.apps.googleusercontent.com';
+  
+  if (!clientId) {
     return (
       <div className="text-sm text-gray-500 text-center py-2">
         Google OAuth not configured

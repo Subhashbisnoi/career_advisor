@@ -89,7 +89,7 @@ const Assessment = ({ assessmentData, onAssessmentCreated, onResultsGenerated })
       console.log('[FRONTEND DEBUG] Formatted responses:', formattedResponses);
 
       // Submit assessment responses using authenticated request helper
-      const submitUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/assessment/submit-responses`;
+      const submitUrl = `${process.env.REACT_APP_API_URL || 'https://career-advisor-backend-yies.onrender.com'}/assessment/submit-responses`;
       console.log('[FRONTEND DEBUG] Submit URL:', submitUrl);
       
       // Create request body matching the backend's expected format
@@ -121,7 +121,7 @@ const Assessment = ({ assessmentData, onAssessmentCreated, onResultsGenerated })
         // Generate career recommendations first
         console.log('[FRONTEND DEBUG] Generating career recommendations...');
         
-        const recommendationsUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/careers/recommendations`;
+        const recommendationsUrl = `${process.env.REACT_APP_API_URL || 'https://career-advisor-backend-yies.onrender.com'}/careers/recommendations`;
         const recommendationsResponse = await makeAuthenticatedRequest(recommendationsUrl, {
           method: 'POST',
           body: JSON.stringify({
