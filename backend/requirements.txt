@@ -27,6 +27,7 @@ psycopg2-binary
 
 # Authentication and security
 python-jose[cryptography]
+PyJWT
 passlib[bcrypt]
 
 # HTTP client
